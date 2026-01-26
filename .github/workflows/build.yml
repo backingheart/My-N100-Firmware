@@ -1,13 +1,11 @@
-name: Build ImmortalWrt for N100
+name: Build ImmortalWrt V2
 
 on:
-  repository_dispatch:
   workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: master
-  FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: .config
   DIY_P2_SH: diy-part2.sh
   TZ: Asia/Shanghai
@@ -18,24 +16,29 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4  # 已升级至 v4
+      uses: actions/checkout@v4
 
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        # 彻底清理：除了必要的，通通删掉，能腾出约 5GB+ 空间
-        docker rmi $(docker images -q)
+        ## 彻底清理 GitHub 虚拟机的无用大型组件，腾出约 5GB+ 空间，防止 llvm 编译失败
         sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup /usr/local/lib/node_modules
+        ## 删除 Docker 镜像以进一步释放空间
+        docker rmi $(docker images -q)
         sudo -E apt-get -qq update
+        ## 安装编译必备依赖包
         sudo -E apt-get -qq install $(curl -fsSL https://is.gd/depends_ubuntu_2204)
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-    
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
     - name: Clone source code
       working-directory: /workdir
       run: |
+        ## 显示清理后的磁盘占用情况
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
@@ -48,20 +51,21 @@ jobs:
 
     - name: Load custom configuration
       run: |
-        # 确保你的 .config 被正确放入源码目录
+        ## 将仓库根目录下的 .config 复制到源码目录
         [ -e $CONFIG_FILE ] && cp $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
-        # 执行你的 diy-part2.sh 进行 IP 和分区扩容修改
+        ## 执行自定义脚本修改 IP 和 分区大小
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        # 核心步骤：根据你的配置自动补全依赖（针对旧 config 迁移）
+        ## 补全缺失依赖，确保配置合法性
         make defconfig
 
     - name: Download package
-      id: package
       run: |
         cd openwrt
+        ## 多线程下载源码包，提高效率
         make download -j8
+        ## 再次检查并删除下载失败的残留空文件
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
@@ -70,14 +74,13 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # 优先使用多核编译，失败则自动切换单核排错
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        ## 优先执行多线程编译，若失败则切换到单线程并输出详细排错日志
+        make -j$(nproc) || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
-        grep "CONFIG_TARGET_ROOTFS_PARTSIZE" .config
 
-    - name: Upload firmware directory
-      uses: actions/upload-artifact@v4  # 已升级至 v4
+    - name: Upload firmware
+      uses: actions/upload-artifact@v4
       if: steps.compile.outputs.status == 'success'
       with:
-        name: ImmortalWrt_firmware
+        name: MyOpenwrt_Immortal_V2
         path: openwrt/bin/targets/x86/64/
