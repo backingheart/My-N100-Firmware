@@ -22,10 +22,17 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        ## 彻底清理 GitHub 虚拟机的无用大型组件，腾出约 5GB+ 空间，防止 llvm 编译失败
+        ## 彻底清理 GitHub 虚拟机的无用大型组件
         sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup /usr/local/lib/node_modules
-        ## 删除 Docker 镜像以进一步释放空间
-        docker rmi $(docker images -q)
+        
+        ## 修正后的 Docker 清理逻辑：先检查是否有镜像，再执行删除，防止报错
+        docker_images=$(docker images -q)
+        if [ -n "$docker_images" ]; then
+          docker rmi $docker_images
+        else
+          echo "## 没有发现可清理的 Docker 镜像，跳过此步骤"
+        fi
+
         sudo -E apt-get -qq update
         ## 安装编译必备依赖包
         sudo -E apt-get -qq install $(curl -fsSL https://is.gd/depends_ubuntu_2204)
