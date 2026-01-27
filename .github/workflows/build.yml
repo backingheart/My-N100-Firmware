@@ -2,8 +2,6 @@ name: Build N100 OpenWrt V3
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: 0 8 * * 5  # 每周五自动编译，可自行开启
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
@@ -46,9 +44,9 @@ jobs:
     - name: Load Custom Feeds (DIY Part 1)
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        chmod +x $diy-part2.sh
+        chmod +x $DIY_P1_SH
         cd openwrt
-        $GITHUB_WORKSPACE/$diy-part2.sh
+        $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: Update & Install Feeds
       run: |
@@ -64,17 +62,13 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
     
-    # =======================================================
-    # 🚨 核心修复：N100 专用 apk mkndx 补丁 (此处为双重保险)
-    # =======================================================
+    # 核心修复补丁
     - name: Apply N100 Specific Fixes
       run: |
         cd openwrt
         echo "Applying apk mkndx fix..."
         find . -name "*.mk" -exec sed -i 's/apk mkndx/true/g' {} +
-        # 强制设置 Intel 显卡/网卡 驱动兼容性 (可选)
         sed -i 's/CONFIG_PACKAGE_kmod-igc=m/CONFIG_PACKAGE_kmod-igc=y/g' .config || true
-    # =======================================================
 
     - name: Download Packages
       run: |
