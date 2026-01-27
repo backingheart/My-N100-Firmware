@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Init Environment
       env:
@@ -102,7 +102,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload Firmware Directory
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_N100_V3
