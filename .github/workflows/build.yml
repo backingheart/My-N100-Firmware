@@ -21,18 +21,20 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    # 🧹 必须保留：磁盘清理 (防止内核编译时空间不足)
-    - name: Free Disk Space (Aggressive)
-      run: |
-        echo "Before cleanup:"
-        df -h
-        sudo rm -rf /etc/apt/sources.list.d/*
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo docker image prune --all --force
-        echo "After cleanup:"
-        df -h
+    # =======================================================
+    # 🚀 空间扩容插件 (彻底解决 No space left on device)
+    # =======================================================
+    - name: Maximize Build Space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 2048
+        swap-size-mb: 1
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+        remove-docker-images: 'true'
+    # =======================================================
 
     - name: Init Environment
       env:
@@ -74,13 +76,14 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
     
-    # 核心修复补丁
+    # 核心修复补丁与 N100 驱动强制开启
     - name: Apply N100 Specific Fixes
       run: |
         cd openwrt
         echo "Applying apk mkndx fix..."
         find . -name "*.mk" -exec sed -i 's/apk mkndx/true/g' {} +
-        # 强制设置 N100 2.5G 网卡驱动为 y (编译进内核)
+        
+        echo "Forcing IGC (2.5G) driver..."
         sed -i 's/CONFIG_PACKAGE_kmod-igc=m/CONFIG_PACKAGE_kmod-igc=y/g' .config || true
 
     - name: Download Packages
