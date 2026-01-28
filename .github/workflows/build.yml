@@ -117,5 +117,3 @@ jobs:
       with:
         name: OpenWrt_N100_V3
         path: ${{ env.FIRMWARE }}
-        name: OpenWrt_N100_V3
-        path: ${{ env.FIRMWARE }}
